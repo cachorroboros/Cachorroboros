@@ -15,39 +15,6 @@
   // ==============================================
   // 🔥 CONFIGURAÇÃO FIREBASE — substitua pelos seus valores
   // ==============================================
-  // ==============================================
-  // 🔒 FIRESTORE SECURITY RULES — configure no Firebase Console
-  // ==============================================
-  // Copie as regras abaixo em:
-  //   Firebase Console → Firestore Database → Rules
-  //
-  // rules_version = '2';
-  // service cloud.firestore {
-  //   match /databases/{database}/documents {
-  //
-  //     // Inscritos: qualquer um pode criar (formulário público),
-  //     // mas NÃO pode ler, atualizar nem apagar sem autenticação.
-  //     match /inscritos/{id} {
-  //       allow create: if request.resource.data.keys().hasOnly([
-  //         'id','nome','data_nasc','idade','rg','cpf','whatsapp',
-  //         'endereco','restricao','menor','resp_nome','resp_rg',
-  //         'resp_whatsapp','aceita_imagem','data_inscricao'
-  //       ])
-  //       && request.resource.data.nome is string
-  //       && request.resource.data.nome.size() <= 120
-  //       && request.resource.data.whatsapp is string
-  //       && request.resource.data.whatsapp.size() <= 20;
-  //       allow read, update, delete: if false; // bloqueado — gerenciar via Firebase Admin SDK
-  //     }
-  //
-  //     // Chamadas: bloqueio total via cliente web
-  //     match /chamadas/{id} {
-  //       allow read, write: if false;
-  //     }
-  //   }
-  // }
-  // ==============================================
-
   const firebaseConfig = {
     apiKey: "AIzaSyAxFL6s635VUPsCqgh52DMfEvMKbw7P7_0",
     authDomain: "cachorroboros-d95a4.firebaseapp.com",
@@ -83,12 +50,6 @@
 // AES-GCM 256-bit via Web Crypto API nativa
 // ================================================================
 (function() {
-  // ⚠️  NOTA DE SEGURANÇA: Em aplicações client-side puras, qualquer chave
-  //     de criptografia embutida no código é visível a quem inspeciona o fonte.
-  //     A criptografia aqui protege contra vazamentos passivos (ex.: dump de banco
-  //     ou log acidental), NÃO contra um invasor que leia este arquivo JS.
-  //     Para proteção completa, mova a leitura/escrita de dados sensíveis para
-  //     um backend com Firebase Admin SDK + autenticação real (Firebase Auth).
   const ENC_PASSWORD = 'cachorro-boros-lgpd-2025';
   const ENC_SALT = new TextEncoder().encode('cachorroboros-salt-v1');
 
@@ -3445,29 +3406,14 @@ OPÇÃO B (temporária, menos segura):
   // =====================
   // SENHA / CONTROLE DE ACESSO
   // =====================
-  // ⚠️  SEGURANÇA: a senha nunca fica em texto claro no código.
-  //     Para trocar a senha, gere um novo hash SHA-256 da senha
-  //     desejada e substitua a constante abaixo.
-  //     Exemplo (console do browser):
-  //       const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('sua-nova-senha'));
-  //       console.log([...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join(''));
-  // ─────────────────────────────────────────────────────────────
-  // Hash SHA-256 de "primordial":
-  const ADMIN_HASH = 'fd87b0b16f72a42a9e43978fd7a65a74bc1a06e98bfba98bbfd0fc04e6cdf1ef';
-
-  async function _sha256hex(str) {
-    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-    return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2,'0')).join('');
-  }
-
   let sessaoAutenticada = false;
 
-  async function checkSenha() {
+  function checkSenha() {
     const input = document.getElementById('lock-input');
     const erro = document.getElementById('lock-error');
-    const hash = await _sha256hex(input.value);
+    const senha = input.value;
 
-    if (hash === ADMIN_HASH) {
+    if (senha === 'primordial') {
       sessaoAutenticada = true;
       document.getElementById('lock-screen').style.display = 'none';
       document.getElementById('inscritos-content').style.display = 'block';
@@ -3580,17 +3526,6 @@ OPÇÃO B (temporária, menos segura):
       data_inscricao: new Date().toLocaleDateString('pt-BR'),
     };
 
-    // Validação de tamanho antes de enviar ao Firestore (defesa em profundidade)
-    const _fieldLimits = { nome: 120, whatsapp: 20, endereco: 200, restricao_detalhe: 500, resp_nome: 120 };
-    for (const [field, limit] of Object.entries(_fieldLimits)) {
-      const val = data.get(field) || '';
-      if (val.length > limit) {
-        alert(`O campo "${field}" excede o limite permitido de ${limit} caracteres.`);
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '⚔ ENVIAR FICHA DE INSCRIÇÃO'; }
-        return;
-      }
-    }
-
     try {
       await addInscrito(inscrito);
       document.getElementById('form-container').style.display = 'none';
@@ -3659,15 +3594,15 @@ OPÇÃO B (temporária, menos segura):
           ${escHtml(i.nome)}
           ${i.menor ? '<br><span class="pill pill-menor">Menor</span>' : ''}
         </td>
-        <td>${escHtml(fmtDate(i.data_nasc))}</td>
-        <td>${escHtml(String(i.idade || '—'))}</td>
+        <td>${fmtDate(i.data_nasc)}</td>
+        <td>${i.idade || '—'}</td>
         <td style="white-space:nowrap">${escHtml(i.whatsapp)}</td>
         <td>${escHtml(i._rgDec) || '—'}</td>
         <td style="font-size:12px">${escHtml(i._cpfDec) || '—'}</td>
         <td>${i.menor ? '<span class="pill pill-menor">Sim</span>' : '<span class="pill pill-no">Não</span>'}</td>
-        <td>${i.restricao ? '<span class="pill pill-restric" title="'+escAttr(i.restricao)+'">Sim</span>' : '<span class="pill pill-ok">Não</span>'}</td>
+        <td>${i.restricao ? '<span class="pill pill-restric" title="'+escHtml(i.restricao)+'">Sim</span>' : '<span class="pill pill-ok">Não</span>'}</td>
         <td>${i.aceita_imagem ? '<span class="pill pill-ok">Autorizado</span>' : '<span class="pill pill-no">Não</span>'}</td>
-        <td style="font-size:12px;white-space:nowrap">${escHtml(i.data_inscricao || '—')}</td>
+        <td style="font-size:12px;white-space:nowrap">${i.data_inscricao || '—'}</td>
         <td>
           <div class="td-actions">
             <button class="act-btn act-wpp" title="Enviar WhatsApp" onclick="sendWpp('${escAttr(i.whatsapp)}','${escAttr(i.nome)}')">💬</button>
@@ -3909,12 +3844,12 @@ OPÇÃO B (temporária, menos segura):
   // CHAMADA — AUTENTICAÇÃO
   // =====================
   let chamadaAutenticada = false;
+  const CHAMADA_SENHA = 'primordial';
 
-  async function unlockChamada() {
+  function unlockChamada() {
     const input = document.getElementById('chamada-pw-input');
     const erro = document.getElementById('chamada-lock-err');
-    const hash = await _sha256hex(input.value);
-    if (hash === ADMIN_HASH) {
+    if (input.value === CHAMADA_SENHA) {
       chamadaAutenticada = true;
       document.getElementById('chamada-lock-screen').style.display = 'none';
       document.getElementById('chamada-content').style.display = 'block';
@@ -3988,7 +3923,7 @@ OPÇÃO B (temporária, menos segura):
           <div class="chamada-check">${presente ? '✓' : ''}</div>
           <div class="chamada-member-name">${escHtml(i.nome)}${i.menor ? ' <span class="pill pill-menor" style="font-size:10px">Menor</span>' : ''}</div>
           <div class="chamada-member-meta">
-            ${i.idade ? `<span>🎂 ${escHtml(String(i.idade))} anos</span>` : ''}
+            ${i.idade ? `<span>🎂 ${i.idade} anos</span>` : ''}
             ${i.restricao ? `<span style="color:var(--red-light)">⚠ Restrição</span>` : ''}
           </div>
         </div>
@@ -4152,13 +4087,13 @@ OPÇÃO B (temporária, menos segura):
         <td style="color:#27ae60">${c.presentes.length}</td>
         <td>${c.total}</td>
         <td>${total > 0 ? Math.round((c.presentes.length / c.total) * 100) : 0}%</td>
-        <td style="font-size:9px">${c.presentes.map(p => escHtml(p.nome||'')).join(', ') || '—'}</td>
+        <td style="font-size:9px">${c.presentes.map(p => p.nome).join(', ') || '—'}</td>
       </tr>`).join('');
 
     const freqRows = freqSorted.map((m, idx) => `
       <tr style="background:${idx % 2 === 0 ? '#f9f9f9' : '#fff'}">
         <td>${idx + 1}</td>
-        <td><strong>${escHtml(m.nome||'')}</strong></td>
+        <td><strong>${m.nome}</strong></td>
         <td style="color:#27ae60">${m.count}</td>
         <td>${total}</td>
         <td>${total > 0 ? Math.round((m.count / total) * 100) : 0}%</td>
