@@ -4204,7 +4204,7 @@ const CSem=CM<6?0:1,CSemKey=CY+'-'+CSem;
 const CSK=CY+'-'+CM;
 
 function mkSeason(y,m){return{key:y+'-'+m,year:y,month:m,name:monthNames[m]+' '+y,stats:{},matches:[]};}
-function mkState(){return{semesterKey:CSemKey,players:[{id:'p1',name:'Beholder'},{id:'p2',name:'Fenix'},{id:'p3',name:'Kira'},{id:'p4',name:'Dragão'},{id:'p5',name:'Corvo'}],seasons:{[CSK]:mkSeason(CY,CM)},currentSeason:CSK,semesterHistory:[]};}
+function mkState(){return{semesterKey:CSemKey,players:[],seasons:{[CSK]:mkSeason(CY,CM)},currentSeason:CSK,semesterHistory:[]};}
 
 let S=loadState()||mkState();
 // ensure current season
