@@ -3135,6 +3135,11 @@ OPÇÃO B (temporária, menos segura):
         <input type="text" id="new-player-name" placeholder="Nome ou apelido...">
         <button class="btn btn-gold" onclick="addPlayer()">Adicionar</button>
       </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;color:var(--text3);margin-bottom:8px;font-family:'Cinzel',serif;letter-spacing:.1em;text-transform:uppercase;">Importar da aba Inscrição</div>
+        <button class="btn btn-outline" style="width:100%;font-size:13px;" onclick="importFromInscritos()">⚔ Importar Inscritos como Combatentes</button>
+        <div id="import-status" style="margin-top:8px;font-size:12px;color:var(--text3);display:none;"></div>
+      </div>
     </details>
   </div>
 
@@ -3186,6 +3191,7 @@ OPÇÃO B (temporária, menos segura):
     <input type="text" id="torneio-player-input" placeholder="Nome do combatente…" maxlength="28" autocomplete="off" />
     <button class="btn btn-outline" onclick="addTPlayer()">+ ADD</button>
   </div>
+  <button class="btn btn-outline" style="width:100%;margin-bottom:8px;font-size:13px;" onclick="importInscritosToTorneio()">📋 Importar Inscritos</button>
   <button class="btn btn-red btn-lg" onclick="startTournament()">⚔ INICIAR TORNEIO</button>
 </div>
 
@@ -4441,6 +4447,40 @@ function addPlayer(){
   populateSelects();renderRanking();showToast(name+' adicionado!');
 }
 
+function importFromInscritos(){
+  // _inscritosCache is the list loaded from Firebase in the main script
+  const inscritos = (typeof _inscritosCache !== 'undefined' ? _inscritosCache : []);
+  if(!inscritos || inscritos.length === 0){
+    const statusEl = document.getElementById('import-status');
+    statusEl.style.display = 'block';
+    statusEl.style.color = 'var(--text3)';
+    statusEl.textContent = '⚠ Nenhum inscrito encontrado. Verifique se há inscrições cadastradas.';
+    return;
+  }
+  let added = 0, skipped = 0;
+  inscritos.forEach(i => {
+    const name = (i.nome || '').trim();
+    if(!name) return;
+    if(S.players.some(p => p.name.toLowerCase() === name.toLowerCase())){
+      skipped++;
+    } else {
+      S.players.push({id:'p'+Date.now()+'_'+Math.random().toString(36).slice(2), name});
+      added++;
+    }
+  });
+  if(added > 0){ saveState(); populateSelects(); renderRanking(); }
+  const statusEl = document.getElementById('import-status');
+  statusEl.style.display = 'block';
+  if(added > 0){
+    statusEl.style.color = 'var(--gold2)';
+    statusEl.textContent = '✓ ' + added + ' combatente' + (added!==1?'s':'') + ' importado' + (added!==1?'s':'') + (skipped > 0 ? ' · ' + skipped + ' já existia' + (skipped!==1?'m':'') : '') + '.';
+    showToast(added + ' inscritos importados para a Arena!');
+  } else {
+    statusEl.style.color = 'var(--text3)';
+    statusEl.textContent = 'Todos os inscritos já são combatentes (' + skipped + ' ignorado' + (skipped!==1?'s':'') + ').';
+  }
+}
+
 function confirmReset(){if(confirm('Resetar o semestre? Histórico será arquivado e rankings zerados.'))resetSemester();}
 
 function resetSemester(){
@@ -4501,6 +4541,32 @@ function addTPlayer() {
 function removeTPlayer(i) {
   tPlayers.splice(i, 1);
   renderSetupList();
+}
+
+function importInscritosToTorneio() {
+  const inscritos = (typeof _inscritosCache !== 'undefined' ? _inscritosCache : []);
+  if (!inscritos || inscritos.length === 0) {
+    alert('Nenhum inscrito encontrado. Cadastre membros na aba Inscrição primeiro.');
+    return;
+  }
+  let added = 0, skipped = 0;
+  inscritos.forEach(i => {
+    const name = (i.nome || '').trim();
+    if (!name) return;
+    if (tPlayers.find(p => p.toLowerCase() === name.toLowerCase())) {
+      skipped++;
+    } else {
+      tPlayers.push(name);
+      added++;
+    }
+  });
+  renderSetupList();
+  if (added > 0) {
+    const info = document.getElementById('count-info');
+    info.innerHTML = `✓ <strong>${added}</strong> inscrito${added!==1?'s':''} importado${added!==1?'s':''}${skipped>0?' ('+skipped+' já existia'+(skipped!==1?'m':'')+')':''}. Total: <strong>${tPlayers.length}</strong> combatentes.`;
+  } else {
+    alert('Todos os inscritos já estão na lista (' + skipped + ' ignorado' + (skipped!==1?'s':'') + ').');
+  }
 }
 
 function renderSetupList() {
