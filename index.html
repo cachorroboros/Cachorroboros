@@ -11,6 +11,7 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
   import { getFirestore, collection, doc, getDocs, addDoc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyAxFL6s635VUPsCqgh52DMfEvMKbw7P7_0",
@@ -22,19 +23,30 @@
     measurementId: "G-1NQW55JWPM"
   };
 
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+  const app  = initializeApp(firebaseConfig);
+  const db   = getFirestore(app);
+  const auth = getAuth(app);
 
-  window._db = db;
-  window._col = (name) => collection(db, name);
-  window._doc = (col, id) => doc(db, col, id);
-  window._getDocs = getDocs;
-  window._addDoc = addDoc;
-  window._setDoc = setDoc;
-  window._deleteDoc = deleteDoc;
+  window._db         = db;
+  window._auth       = auth;
+  window._col        = (name) => collection(db, name);
+  window._doc        = (col, id) => doc(db, col, id);
+  window._getDocs    = getDocs;
+  window._addDoc     = addDoc;
+  window._setDoc     = setDoc;
+  window._deleteDoc  = deleteDoc;
   window._onSnapshot = onSnapshot;
-  window._query = query;
-  window._orderBy = orderBy;
+  window._query      = query;
+  window._orderBy    = orderBy;
+  window._signIn     = (email, password) => signInWithEmailAndPassword(auth, email, password);
+  window._signOut    = () => signOut(auth);
+
+  // Observa sessao Firebase e notifica o app
+  onAuthStateChanged(auth, (user) => {
+    window._authUser = user || null;
+    window.dispatchEvent(new CustomEvent('authChanged', { detail: { user } }));
+  });
+
   window._firebaseReady = true;
   window.dispatchEvent(new Event('firebaseReady'));
 </script>
@@ -254,6 +266,148 @@
 
   .tab-btn:hover { color: var(--cream); background: rgba(255,255,255,0.04); }
   .tab-btn.active { color: var(--red-light); border-bottom-color: var(--red); background: rgba(212,32,32,0.07); }
+
+  /* ── Auth area na navbar ── */
+  .nav-auth-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    flex-shrink: 0;
+    border-left: 1px solid rgba(212,32,32,0.2);
+    margin-left: auto;
+  }
+  #nav-user-email {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    color: var(--warm-gray);
+    letter-spacing: 0.05em;
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .nav-auth-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    border-radius: 3px;
+    cursor: pointer;
+    border: 1px solid rgba(212,32,32,0.5);
+    background: rgba(212,32,32,0.12);
+    color: var(--cream);
+    transition: background 0.2s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .nav-auth-btn:hover { background: rgba(212,32,32,0.25); border-color: var(--red); }
+  .nav-auth-btn-out   { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); }
+  .nav-auth-btn-out:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.3); }
+
+  /* ── Modal de login Firebase ── */
+  .login-modal-bg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(10,10,10,0.82);
+    z-index: 9000;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(4px);
+  }
+  .login-modal-bg.open { display: flex; }
+  .login-modal {
+    background: var(--mid);
+    border: 1px solid rgba(212,32,32,0.35);
+    border-radius: 6px;
+    padding: 40px 36px 32px;
+    width: 100%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    animation: loginSlideIn 0.22s ease;
+  }
+  @keyframes loginSlideIn {
+    from { opacity:0; transform:translateY(-18px) scale(0.97); }
+    to   { opacity:1; transform:translateY(0)     scale(1);    }
+  }
+  .login-modal-icon { font-size: 36px; margin-bottom: 14px; }
+  .login-modal-title {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 28px;
+    letter-spacing: 0.05em;
+    color: var(--cream);
+    margin-bottom: 6px;
+  }
+  .login-modal-sub {
+    font-size: 13px;
+    color: var(--warm-gray);
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: 28px;
+  }
+  .login-field { width: 100%; display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+  .login-label {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(245,240,232,0.5);
+  }
+  .login-pw-wrap { position: relative; width: 100%; }
+  .login-pw-toggle {
+    position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; cursor: pointer; font-size: 16px; opacity: 0.5; padding: 0;
+  }
+  .login-pw-toggle:hover { opacity: 1; }
+  .login-input {
+    width: 100%;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(212,32,32,0.25);
+    border-radius: 3px;
+    color: var(--cream);
+    font-family: 'Barlow', sans-serif;
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .login-input:focus { border-color: var(--red); background: rgba(212,32,32,0.07); }
+  .login-input::placeholder { color: rgba(245,240,232,0.25); }
+  .login-error {
+    width: 100%;
+    background: rgba(212,32,32,0.12);
+    border: 1px solid rgba(212,32,32,0.4);
+    border-radius: 3px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #ff7070;
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .login-submit-btn {
+    width: 100%; padding: 14px;
+    background: var(--red); color: white; border: none; border-radius: 3px;
+    font-family: 'Bebas Neue', sans-serif; font-size: 20px; letter-spacing: 0.15em;
+    cursor: pointer; transition: background 0.2s, transform 0.15s; margin-top: 6px;
+  }
+  .login-submit-btn:hover:not(:disabled) { background: var(--red-dark); transform: translateY(-1px); }
+  .login-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .login-cancel-btn {
+    margin-top: 12px; background: none; border: none; color: var(--warm-gray);
+    font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer;
+    padding: 6px 12px; border-radius: 3px; transition: color 0.2s;
+  }
+  .login-cancel-btn:hover { color: var(--cream); }
 
   .section { display: none; }
   .section.active { display: block; }
@@ -1874,7 +2028,43 @@
   <button class="tab-btn" onclick="showTab('chamada', this)">🔒 Chamada</button>
   <button class="tab-btn" onclick="showTab('arena', this)">🗡 Arena</button>
   <button class="tab-btn" onclick="showTab('torneio', this)">🏆 Torneio</button>
+  <div class="nav-auth-area">
+    <span id="nav-user-email"></span>
+    <button id="nav-login-btn"  class="nav-auth-btn" onclick="openLoginModal()" style="display:none">🔑 Entrar</button>
+    <button id="nav-logout-btn" class="nav-auth-btn nav-auth-btn-out" onclick="adminSignOut()" style="display:none">Sair</button>
+  </div>
 </nav>
+
+<!-- ================ MODAL DE LOGIN FIREBASE ================ -->
+<div id="login-modal-bg" class="login-modal-bg" onclick="if(event.target===this)closeLoginModal()">
+  <div class="login-modal">
+    <div class="login-modal-icon">🗡</div>
+    <div class="login-modal-title">Área Administrativa</div>
+    <p class="login-modal-sub">Acesso exclusivo para coordenadores do Cachorroboros.</p>
+
+    <div class="login-field">
+      <label class="login-label">E-mail</label>
+      <input type="email" id="login-email" class="login-input" placeholder="admin@email.com"
+             onkeydown="if(event.key==='Enter')document.getElementById('login-pw').focus()"
+             autocomplete="username">
+    </div>
+    <div class="login-field">
+      <label class="login-label">Senha</label>
+      <div class="login-pw-wrap">
+        <input type="password" id="login-pw" class="login-input" placeholder="••••••••"
+               onkeydown="if(event.key==='Enter')doLogin()"
+               autocomplete="current-password">
+        <button class="login-pw-toggle" type="button"
+                onclick="const i=document.getElementById('login-pw');i.type=i.type==='password'?'text':'password'">👁</button>
+      </div>
+    </div>
+
+    <div id="login-error" class="login-error" style="display:none"></div>
+
+    <button class="login-submit-btn" id="login-submit" onclick="doLogin()">⚔ ENTRAR</button>
+    <button class="login-cancel-btn" onclick="closeLoginModal()">Cancelar</button>
+  </div>
+</div>
 
 <!-- INÍCIO -->
 <section id="tab-inicio" class="section active">
@@ -2143,15 +2333,8 @@
   <div id="lock-screen" class="lock-screen">
     <div class="lock-icon">🔒</div>
     <div class="lock-title">Área Restrita</div>
-    <div class="lock-sub">Esta área é exclusiva para coordenadores.<br>Digite a senha de acesso para continuar.</div>
-    <div class="lock-form">
-      <div class="lock-input-wrap">
-        <input type="password" id="lock-input" class="lock-input" placeholder="••••••••••" onkeydown="if(event.key==='Enter')checkSenha()" oninput="document.getElementById('lock-error').textContent=''" autocomplete="off">
-        <button class="lock-toggle-vis" onclick="toggleSenhaVis()" title="Mostrar/ocultar senha" type="button">👁</button>
-      </div>
-      <div id="lock-error" class="lock-error-msg"></div>
-      <button class="lock-btn" onclick="checkSenha()">⚔ ENTRAR</button>
-    </div>
+    <div class="lock-sub">Esta área é exclusiva para coordenadores.<br>Faça login para continuar.</div>
+    <button class="lock-btn" onclick="openLoginModal()">🔑 Fazer Login</button>
   </div>
 
   <div id="inscritos-content" style="display:none">
@@ -2211,11 +2394,7 @@
       <div class="chamada-lock-icon">🔒</div>
       <div class="chamada-lock-title">Área Restrita</div>
       <p class="chamada-lock-sub">Acesso exclusivo para coordenadores</p>
-      <div class="chamada-lock-row">
-        <input type="password" id="chamada-pw-input" placeholder="Senha" onkeydown="if(event.key==='Enter')unlockChamada()">
-        <button class="chamada-unlock-btn" onclick="unlockChamada()">Entrar</button>
-      </div>
-      <div class="chamada-lock-err" id="chamada-lock-err">Senha incorreta. Tente novamente.</div>
+      <button class="chamada-unlock-btn" onclick="openLoginModal()">🔑 Fazer Login</button>
     </div>
   </div>
 
@@ -2540,30 +2719,43 @@
     if request.auth != null && request.auth.uid == 'SEU_UID_ADMIN'
   ===================================================================== -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
+  import { initializeApp }      from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
   import { getFirestore, collection, doc, getDocs, addDoc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
-  const firebaseConfig = {
-    apiKey: "AIzaSyAxFL6s635VUPsCqgh52DMfEvMKbw7P7_0",
-    authDomain: "cachorroboros-d95a4.firebaseapp.com",
-    projectId: "cachorroboros-d95a4",
-    storageBucket: "cachorroboros-d95a4.firebasestorage.app",
-    messagingSenderId: "1049322844421",
-    appId: "1:1049322844421:web:5103096ed1a49cbf14076c",
-    measurementId: "G-1NQW55JWPM"
-  };
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  window._db = db;
-  window._col = (name) => collection(db, name);
-  window._doc = (col, id) => doc(db, col, id);
-  window._getDocs = getDocs;
-  window._addDoc = addDoc;
-  window._setDoc = setDoc;
-  window._deleteDoc = deleteDoc;
-  window._onSnapshot = onSnapshot;
-  window._query = query;
-  window._orderBy = orderBy;
-  if (!window._firebaseReady) { window._firebaseReady = true; window.dispatchEvent(new Event('firebaseReady')); }
+  import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-auth.js";
+  // Bloco de fallback: só inicializa se o módulo do <head> não carregou ainda
+  if (!window._firebaseReady) {
+    const firebaseConfig = {
+      apiKey: "AIzaSyAxFL6s635VUPsCqgh52DMfEvMKbw7P7_0",
+      authDomain: "cachorroboros-d95a4.firebaseapp.com",
+      projectId: "cachorroboros-d95a4",
+      storageBucket: "cachorroboros-d95a4.firebasestorage.app",
+      messagingSenderId: "1049322844421",
+      appId: "1:1049322844421:web:5103096ed1a49cbf14076c",
+      measurementId: "G-1NQW55JWPM"
+    };
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
+    window._db         = db;
+    window._auth       = auth;
+    window._col        = (name) => collection(db, name);
+    window._doc        = (col, id) => doc(db, col, id);
+    window._getDocs    = getDocs;
+    window._addDoc     = addDoc;
+    window._setDoc     = setDoc;
+    window._deleteDoc  = deleteDoc;
+    window._onSnapshot = onSnapshot;
+    window._query      = query;
+    window._orderBy    = orderBy;
+    window._signIn     = (email, password) => signInWithEmailAndPassword(auth, email, password);
+    window._signOut    = () => signOut(auth);
+    onAuthStateChanged(auth, (user) => {
+      window._authUser = user || null;
+      window.dispatchEvent(new CustomEvent('authChanged', { detail: { user } }));
+    });
+    window._firebaseReady = true;
+    window.dispatchEvent(new Event('firebaseReady'));
+  }
 </script>
 
 <script>
@@ -2634,51 +2826,117 @@ async function initFirebaseData() {
   if (el) el.style.display = 'none';
 }
 
-// ===================== SENHA =====================
-// Senha armazenada como hash SHA-256 — nunca em texto plano no código.
-// Para trocar a senha, gere um novo hash: await sha256('nova-senha')
-// Hash atual corresponde à senha definida pelo administrador.
-const SENHA_HASH = '6c4a0b1e7c9d2f8a3b5e1d4c7f0a9b2e6d8c1f4a7b0e3d6c9f2a5b8e1d4c7f0'; // placeholder – veja comentário abaixo
+// ===================== AUTENTICAÇÃO FIREBASE =====================
 
-// IMPORTANTE: substitua SENHA_HASH pelo hash real da sua senha.
-// Execute no console: crypto.subtle.digest('SHA-256', new TextEncoder().encode('suasenha'))
-//   .then(b => console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))
-// O hash de 'primordial' é gerado automaticamente na primeira carga para facilitar a migração:
-let _senhaHashReal = null;
-(async () => {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('primordial'));
-  _senhaHashReal = [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2,'0')).join('');
-})();
-
-async function sha256(str) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
-  return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2,'0')).join('');
+function openLoginModal() {
+  document.getElementById('login-modal-bg').classList.add('open');
+  setTimeout(() => {
+    const em = document.getElementById('login-email');
+    if (em) em.focus();
+  }, 120);
 }
 
-let sessaoAutenticada = false;
+function closeLoginModal() {
+  document.getElementById('login-modal-bg').classList.remove('open');
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-email').value = '';
+  document.getElementById('login-pw').value = '';
+}
 
-async function checkSenha() {
-  const input = document.getElementById('lock-input');
-  const erro = document.getElementById('lock-error');
-  const hash = await sha256(input.value);
-  if (hash === _senhaHashReal) {
-    sessaoAutenticada = true;
-    document.getElementById('lock-screen').style.display = 'none';
-    document.getElementById('inscritos-content').style.display = 'block';
-    renderStats(); renderTable();
-  } else {
-    erro.textContent = 'Senha incorreta. Tente novamente.';
-    input.value = '';
-    input.classList.add('error');
-    input.focus();
-    setTimeout(() => input.classList.remove('error'), 400);
+async function doLogin() {
+  const email  = document.getElementById('login-email').value.trim();
+  const pw     = document.getElementById('login-pw').value;
+  const errEl  = document.getElementById('login-error');
+  const btn    = document.getElementById('login-submit');
+
+  if (!email || !pw) {
+    errEl.textContent = 'Preencha e-mail e senha.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Entrando...';
+  errEl.style.display = 'none';
+
+  try {
+    await window._signIn(email, pw);
+    closeLoginModal();
+    // onAuthStateChanged cuida do restante
+  } catch(err) {
+    const msgs = {
+      'auth/invalid-credential':    'E-mail ou senha incorretos.',
+      'auth/user-not-found':        'Usuário não encontrado.',
+      'auth/wrong-password':        'Senha incorreta.',
+      'auth/invalid-email':         'E-mail inválido.',
+      'auth/too-many-requests':     'Muitas tentativas. Aguarde alguns minutos.',
+      'auth/network-request-failed':'Sem conexão. Verifique sua internet.',
+    };
+    errEl.textContent = msgs[err.code] || 'Erro ao fazer login. Tente novamente.';
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '⚔ ENTRAR';
   }
 }
 
-function toggleSenhaVis() {
-  const input = document.getElementById('lock-input');
-  input.type = input.type === 'password' ? 'text' : 'password';
+async function adminSignOut() {
+  await window._signOut();
+  // onAuthStateChanged cuida do restante
 }
+
+// Reage a mudanças de autenticação (login, logout, reload de página)
+window.addEventListener('authChanged', (e) => {
+  const user = e.detail.user;
+  _onAuthStateUpdate(user);
+});
+
+function _onAuthStateUpdate(user) {
+  const loggedIn = !!user;
+
+  // Navbar
+  const emailEl  = document.getElementById('nav-user-email');
+  const loginBtn  = document.getElementById('nav-login-btn');
+  const logoutBtn = document.getElementById('nav-logout-btn');
+  if (emailEl)  emailEl.textContent  = loggedIn ? user.email : '';
+  if (loginBtn)  loginBtn.style.display  = loggedIn ? 'none'  : 'inline-flex';
+  if (logoutBtn) logoutBtn.style.display = loggedIn ? 'inline-flex' : 'none';
+
+  // Aba Inscritos
+  const lockInscritos    = document.getElementById('lock-screen');
+  const contentInscritos = document.getElementById('inscritos-content');
+  if (lockInscritos && contentInscritos) {
+    if (loggedIn) {
+      lockInscritos.style.display    = 'none';
+      contentInscritos.style.display = 'block';
+      if (typeof renderStats === 'function') renderStats();
+      if (typeof renderTable === 'function') renderTable();
+    } else {
+      lockInscritos.style.display    = 'flex';
+      contentInscritos.style.display = 'none';
+    }
+  }
+
+  // Aba Chamada
+  const lockChamada    = document.getElementById('chamada-lock-screen');
+  const contentChamada = document.getElementById('chamada-content');
+  if (lockChamada && contentChamada) {
+    if (loggedIn) {
+      lockChamada.style.display    = 'none';
+      contentChamada.style.display = 'block';
+      if (typeof initChamada === 'function') initChamada();
+    } else {
+      lockChamada.style.display    = 'block';
+      contentChamada.style.display = 'none';
+    }
+  }
+}
+
+// Exibe o botão de login após o Firebase inicializar
+window.addEventListener('firebaseReady', () => {
+  const btn = document.getElementById('nav-login-btn');
+  if (btn) btn.style.display = 'inline-flex';
+});
 
 // ===================== TABS =====================
 function showTab(tab, btn) {
@@ -2689,16 +2947,8 @@ function showTab(tab, btn) {
   else document.querySelectorAll('.tab-btn').forEach(b => {
     if (b.getAttribute('onclick') && b.getAttribute('onclick').includes("'" + tab + "'")) b.classList.add('active');
   });
-  if (tab === 'inscritos') {
-    if (sessaoAutenticada) {
-      document.getElementById('lock-screen').style.display = 'none';
-      document.getElementById('inscritos-content').style.display = 'block';
-      renderStats(); renderTable();
-    } else {
-      document.getElementById('lock-screen').style.display = 'flex';
-      document.getElementById('inscritos-content').style.display = 'none';
-      setTimeout(() => { const inp = document.getElementById('lock-input'); if (inp) { inp.value = ''; inp.focus(); } }, 150);
-    }
+  if ((tab === 'inscritos' || tab === 'chamada') && !window._authUser) {
+    openLoginModal();
   }
   if (tab === 'arena' && typeof initArena === 'function') initArena();
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2908,23 +3158,6 @@ async function exportXLSX() {
 }
 
 // ===================== CHAMADA =====================
-let chamadaAutenticada = false;
-
-async function unlockChamada() {
-  const input = document.getElementById('chamada-pw-input');
-  const erro = document.getElementById('chamada-lock-err');
-  const hash = await sha256(input.value);
-  if (hash === _senhaHashReal) {
-    chamadaAutenticada = true;
-    document.getElementById('chamada-lock-screen').style.display = 'none';
-    document.getElementById('chamada-content').style.display = 'block';
-    initChamada();
-  } else {
-    erro.style.display = 'block'; input.value = ''; input.focus();
-    setTimeout(() => { erro.style.display = 'none'; }, 3000);
-  }
-}
-
 let chamadaSessao = {};
 
 function initChamada() {
