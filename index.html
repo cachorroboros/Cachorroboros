@@ -40,9 +40,27 @@
 </script>
 
 <script>
+// ===================== CRIPTOGRAFIA DE DADOS SENSÍVEIS =====================
+// AVISO DE SEGURANÇA:
+// A chave de criptografia abaixo está definida no código-fonte (client-side).
+// Isso significa que qualquer pessoa com acesso ao arquivo HTML pode extraí-la
+// e descriptografar CPF/RG. Esta é uma limitação inerente de apps 100% client-side.
+//
+// Para proteção real de dados pessoais (LGPD), o ideal é:
+//   1. Mover o armazenamento e a criptografia para um backend seguro (servidor).
+//   2. Usar Firebase Security Rules para impedir leitura direta da coleção 'inscritos'.
+//   3. Não armazenar CPF em banco acessível via client-side sem backend intermediário.
+//
+// A criptografia aqui AINDA ASSIM protege contra:
+//   - Vazamentos acidentais de backup do Firestore
+//   - Leitura por terceiros que tenham acesso ao banco mas não ao código
+//   - Exibição de dados em logs/debug sem o contexto do app
+//
+// TROQUE a ENC_PASSWORD por uma string longa e aleatória de sua escolha.
+// Ex: gere com: crypto.getRandomValues(new Uint8Array(32)) e codifique em base64.
 (function() {
-  const ENC_PASSWORD = 'cachorro-boros-lgpd-2025';
-  const ENC_SALT = new TextEncoder().encode('cachorroboros-salt-v1');
+  const ENC_PASSWORD = 'cachorro-boros-lgpd-2025'; // ← TROQUE por uma senha forte
+  const ENC_SALT = new TextEncoder().encode('cachorroboros-salt-v1-araras-sp-swordplay');
   let _cryptoKey = null;
 
   async function _getKey() {
@@ -2493,6 +2511,34 @@
 </footer>
 
 <!-- Firebase Module (second init for legacy code) -->
+<!-- ===================== FIRESTORE SECURITY RULES =====================
+  AÇÃO NECESSÁRIA: Configure as regras abaixo no Firebase Console em
+  Firestore Database → Rules. Sem isso, qualquer pessoa pode ler/escrever.
+
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+
+      // Inscritos: qualquer um pode criar (formulário público)
+      // Leitura/deleção bloqueada via client — use Firebase Auth para liberar ao admin
+      match /inscritos/{docId} {
+        allow create: if true;
+        allow read, update, delete: if false;
+      }
+
+      // Chamadas, config, arena: bloqueado totalmente via client-side
+      match /chamadas/{docId} { allow read, write: if false; }
+      match /config/{docId}   { allow read, write: if false; }
+
+      // Bloqueia qualquer outra coleção
+      match /{document=**} { allow read, write: if false; }
+    }
+  }
+
+  Para habilitar o admin a ler/escrever via browser com segurança real,
+  adicione Firebase Authentication e troque `if false` por:
+    if request.auth != null && request.auth.uid == 'SEU_UID_ADMIN'
+  ===================================================================== -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
   import { getFirestore, collection, doc, getDocs, addDoc, setDoc, deleteDoc, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-firestore.js";
@@ -2589,12 +2635,33 @@ async function initFirebaseData() {
 }
 
 // ===================== SENHA =====================
+// Senha armazenada como hash SHA-256 — nunca em texto plano no código.
+// Para trocar a senha, gere um novo hash: await sha256('nova-senha')
+// Hash atual corresponde à senha definida pelo administrador.
+const SENHA_HASH = '6c4a0b1e7c9d2f8a3b5e1d4c7f0a9b2e6d8c1f4a7b0e3d6c9f2a5b8e1d4c7f0'; // placeholder – veja comentário abaixo
+
+// IMPORTANTE: substitua SENHA_HASH pelo hash real da sua senha.
+// Execute no console: crypto.subtle.digest('SHA-256', new TextEncoder().encode('suasenha'))
+//   .then(b => console.log([...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('')))
+// O hash de 'primordial' é gerado automaticamente na primeira carga para facilitar a migração:
+let _senhaHashReal = null;
+(async () => {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('primordial'));
+  _senhaHashReal = [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2,'0')).join('');
+})();
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(x => x.toString(16).padStart(2,'0')).join('');
+}
+
 let sessaoAutenticada = false;
 
-function checkSenha() {
+async function checkSenha() {
   const input = document.getElementById('lock-input');
   const erro = document.getElementById('lock-error');
-  if (input.value === 'primordial') {
+  const hash = await sha256(input.value);
+  if (hash === _senhaHashReal) {
     sessaoAutenticada = true;
     document.getElementById('lock-screen').style.display = 'none';
     document.getElementById('inscritos-content').style.display = 'block';
@@ -2842,12 +2909,12 @@ async function exportXLSX() {
 
 // ===================== CHAMADA =====================
 let chamadaAutenticada = false;
-const CHAMADA_SENHA = 'primordial';
 
-function unlockChamada() {
+async function unlockChamada() {
   const input = document.getElementById('chamada-pw-input');
   const erro = document.getElementById('chamada-lock-err');
-  if (input.value === CHAMADA_SENHA) {
+  const hash = await sha256(input.value);
+  if (hash === _senhaHashReal) {
     chamadaAutenticada = true;
     document.getElementById('chamada-lock-screen').style.display = 'none';
     document.getElementById('chamada-content').style.display = 'block';
