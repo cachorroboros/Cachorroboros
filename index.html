@@ -2891,10 +2891,10 @@ window.addEventListener('authChanged', (e) => {
   _onAuthStateUpdate(user);
 });
 
-function _onAuthStateUpdate(user) {
+async function _onAuthStateUpdate(user) {
   const loggedIn = !!user;
 
-  // Navbar
+  // ── Navbar ──
   const emailEl  = document.getElementById('nav-user-email');
   const loginBtn  = document.getElementById('nav-login-btn');
   const logoutBtn = document.getElementById('nav-logout-btn');
@@ -2902,30 +2902,52 @@ function _onAuthStateUpdate(user) {
   if (loginBtn)  loginBtn.style.display  = loggedIn ? 'none'  : 'inline-flex';
   if (logoutBtn) logoutBtn.style.display = loggedIn ? 'inline-flex' : 'none';
 
-  // Aba Inscritos
-  const lockInscritos    = document.getElementById('lock-screen');
-  const contentInscritos = document.getElementById('inscritos-content');
-  if (lockInscritos && contentInscritos) {
-    if (loggedIn) {
+  if (loggedIn) {
+    // Carrega todos os dados agora que temos permissão no Firestore
+    await initFirebaseData();
+
+    // ── Aba Inscritos ──
+    const lockInscritos    = document.getElementById('lock-screen');
+    const contentInscritos = document.getElementById('inscritos-content');
+    if (lockInscritos && contentInscritos) {
       lockInscritos.style.display    = 'none';
       contentInscritos.style.display = 'block';
       if (typeof renderStats === 'function') renderStats();
       if (typeof renderTable === 'function') renderTable();
-    } else {
-      lockInscritos.style.display    = 'flex';
-      contentInscritos.style.display = 'none';
     }
-  }
 
-  // Aba Chamada
-  const lockChamada    = document.getElementById('chamada-lock-screen');
-  const contentChamada = document.getElementById('chamada-content');
-  if (lockChamada && contentChamada) {
-    if (loggedIn) {
+    // ── Aba Chamada ──
+    const lockChamada    = document.getElementById('chamada-lock-screen');
+    const contentChamada = document.getElementById('chamada-content');
+    if (lockChamada && contentChamada) {
       lockChamada.style.display    = 'none';
       contentChamada.style.display = 'block';
       if (typeof initChamada === 'function') initChamada();
-    } else {
+    }
+
+    // ── Arena: reinicia para buscar config do Firestore ──
+    window._arenaInitialized = false;
+    if (document.getElementById('tab-arena').classList.contains('active')) {
+      if (typeof initArena === 'function') initArena();
+    }
+
+  } else {
+    // Logout: limpa caches e fecha abas protegidas
+    _inscritosCache = [];
+    _chamadaCache   = [];
+    window._arenaStateCache  = null;
+    window._arenaInitialized = false;
+
+    const lockInscritos    = document.getElementById('lock-screen');
+    const contentInscritos = document.getElementById('inscritos-content');
+    if (lockInscritos && contentInscritos) {
+      lockInscritos.style.display    = 'flex';
+      contentInscritos.style.display = 'none';
+    }
+
+    const lockChamada    = document.getElementById('chamada-lock-screen');
+    const contentChamada = document.getElementById('chamada-content');
+    if (lockChamada && contentChamada) {
       lockChamada.style.display    = 'block';
       contentChamada.style.display = 'none';
     }
@@ -3285,7 +3307,7 @@ function exportarRelatorioPDF() {
   if (!win) { const a = document.createElement('a'); a.href = url; a.download = 'relatorio.html'; a.click(); }
 }
 
-waitFirebase(() => { initFirebaseData(); });
+// Dados carregados sob demanda após login — veja _onAuthStateUpdate()
 </script>
 
 <!-- ARENA SCRIPT -->
@@ -3294,6 +3316,8 @@ window._arenaStateCache = null;
 
 function initArena() {
   if (window._arenaInitialized) return;
+  // Só inicializa se o usuário estiver autenticado
+  if (!window._authUser) return;
   window._arenaInitialized = true;
   waitFirebase(async () => {
     try {
@@ -3304,6 +3328,7 @@ function initArena() {
     if (loaded) { S = loaded; if (!S.seasons[CSK]) { S.seasons[CSK] = mkSeason(CY, CM); } S.currentSeason = CSK; }
     populateSelects();
     viewSK = S.currentSeason;
+    renderRanking();
   });
 }
 
@@ -3314,7 +3339,7 @@ const TIER_CFG={S:{color:'var(--s)',bg:'rgba(93,173,226,0.12)',range:'≥80% WR'
 function loadState(){return window._arenaStateCache||null;}
 function saveState(){
   window._arenaStateCache=S;
-  if(window._firebaseReady){
+  if(window._firebaseReady && window._authUser){
     window._setDoc(window._doc('config','arena_state'),{data:JSON.stringify(S)}).catch(e=>console.warn('Arena saveState error',e));
   }
 }
@@ -3330,7 +3355,7 @@ function mkState(){return{semesterKey:CSemKey,players:[],seasons:{[CSK]:mkSeason
 let S=loadState()||mkState();
 if(!S.seasons[CSK]){S.seasons[CSK]=mkSeason(CY,CM);}
 S.currentSeason=CSK;
-saveState();
+// saveState() só é chamado após autenticação — veja initArena()
 
 let viewSK=S.currentSeason;
 let M={active:false};
