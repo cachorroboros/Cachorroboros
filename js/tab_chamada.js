@@ -272,7 +272,10 @@ async function limparHistorico() {
 
   window.showLoading?.(true);
   try {
-    const { error } = await window._supabase.from('chamadas').delete().neq('data', '');
+    const { error } = await window._supabase
+      .from('chamadas')
+      .delete()
+      .not('data', 'is', null);   // ← CORRIGIDO AQUI
     if (error) throw error;
     window._chamadaCache = [];
     await renderRelatorio();
