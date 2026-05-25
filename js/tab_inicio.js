@@ -1,0 +1,1 @@
+// Aba Início – nenhuma lógica específica
