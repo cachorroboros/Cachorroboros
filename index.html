@@ -2909,32 +2909,38 @@ async function handleSubmit(e) {
   e.preventDefault();
   const form = e.target;
   if (!form.checkValidity()) { form.reportValidity(); return; }
+
   const submitBtn = form.querySelector('.submit-btn');
   if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Enviando...'; }
+
   const data = new FormData(form);
   const isMinor = document.getElementById('minor-fields').classList.contains('show');
   const hasRestric = data.get('restricao') === 'sim';
-  const [_encCpf, _encRg] = await Promise.all([
-    window._encryptField(data.get('cpf') || ''),
-    window._encryptField(data.get('rg') || ''),
-  ]);
+
   const inscrito = {
-    id: Date.now(), nome: data.get('nome') || '', data_nasc: data.get('data_nasc') || '',
-    idade: data.get('idade') || '', rg: _encRg, cpf: _encCpf, whatsapp: data.get('whatsapp') || '',
-    endereco: data.get('endereco') || '', restricao: hasRestric ? (data.get('restricao_detalhe') || 'Sim') : null,
-    menor: isMinor, resp_nome: isMinor ? (data.get('resp_nome') || '') : null,
-    resp_rg: isMinor ? (data.get('resp_rg') || '') : null,
+    nome: data.get('nome') || '',
+    data_nasc: data.get('data_nasc') || '',
+    idade: data.get('idade') || '',
+    whatsapp: data.get('whatsapp') || '',
+    endereco: data.get('endereco') || '',
+    restricao: hasRestric ? (data.get('restricao_detalhe') || 'Sim') : null,
+    menor: isMinor,
+    resp_nome: isMinor ? (data.get('resp_nome') || '') : null,
     resp_whatsapp: isMinor ? (data.get('resp_whatsapp') || '') : null,
     aceita_imagem: !!data.get('aceita_imagem'),
-    data_inscricao: new Date().toLocaleDateString('pt-BR'),
+    aceita_termos: !!data.get('aceita_termos'),
+    cpf_raw: data.get('cpf') || '',   // CPF texto puro
+    rg_raw: data.get('rg') || ''      // RG texto puro
   };
+
   try {
     await addInscrito(inscrito);
     document.getElementById('form-container').style.display = 'none';
     document.getElementById('success-state').classList.add('show');
     window.scrollTo({ top: 0, behavior: 'smooth' });
-  } catch(err) {
-    alert('Erro ao salvar inscrição. Verifique a conexão e tente novamente.');
+  } catch (err) {
+    alert('Erro ao salvar: ' + err.message);
+  } finally {
     if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = '⚔ ENVIAR FICHA DE INSCRIÇÃO'; }
   }
 }
