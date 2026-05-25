@@ -2705,6 +2705,105 @@ async function adminSignOut() {
   await window._signOut();
 }
 
+async function loadInscritosAsync() {
+  const { data, error } = await supabase
+    .from('inscritos')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Erro ao carregar inscritos:', error);
+    return _inscritosCache;
+  }
+
+  _inscritosCache = data.map(i => ({
+    ...i,
+    _docId: i.id,   // para manter compatibilidade com o código existente
+    id: i.id         // usaremos o 'id' do banco como identificador
+  }));
+  return _inscritosCache;
+}
+
+async function addInscrito(inscrito) {
+  // Mapeia os campos para o formato esperado pela Edge Function
+  const body = {
+    nome: inscrito.nome,
+    data_nasc: inscrito.data_nasc,
+    idade: inscrito.idade ? parseInt(inscrito.idade) : null,
+    whatsapp: inscrito.whatsapp,
+    endereco: inscrito.endereco || null,
+    restricao: inscrito.restricao || null,
+    restricao_flag: !!inscrito.restricao,
+    menor: inscrito.menor || false,
+    resp_nome: inscrito.resp_nome || null,
+    resp_whatsapp: inscrito.resp_whatsapp || null,
+    aceita_imagem: inscrito.aceita_imagem || false,
+    aceita_termos: inscrito.aceita_termos || true,
+    cpf: inscrito.cpf_raw || '',   // CPF em texto puro
+    rg: inscrito.rg_raw || ''      // RG em texto puro
+  };
+
+  async function deleteInscritoFirebase(inscrito) {
+  const { error } = await supabase
+    .from('inscritos')
+    .delete()
+    .eq('id', inscrito.id);
+  if (error) throw error;
+  _inscritosCache = _inscritosCache.filter(i => i.id !== inscrito.id);
+}
+
+async function loadChamadasAsync() {
+  const { data, error } = await supabase
+    .from('chamadas')
+    .select('*')
+    .order('data', { ascending: false });
+
+  if (error) throw error;
+  _chamadaCache = data;
+  return _chamadaCache;
+}
+
+function loadChamadas() { return _chamadaCache; }
+
+async function saveChamadasFirebase(arr) {
+  // Upsert (insert or update) para cada chamada
+  for (const c of arr) {
+    const { error } = await supabase
+      .from('chamadas')
+      .upsert({
+        data: c.data,          // 'YYYY-MM-DD'
+        data_fmt: c.dataFmt,
+        total: c.total,
+        presentes: c.presentes,
+        saved_at: c.savedAt
+      }, { onConflict: 'data' });   // conflito pela data única
+
+    if (error) throw error;
+  }
+  _chamadaCache = arr;
+}
+
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/submit-inscricao`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || 'Erro ao enviar inscrição');
+  }
+
+  const { id } = await res.json();
+  // Adiciona ao cache local (sem CPF/RG descriptografados)
+  const novo = { ...inscrito, id, _docId: id, created_at: new Date().toISOString() };
+  _inscritosCache.unshift(novo);
+}
+
+function loadInscritos() {
+  return _inscritosCache;
+}
+
 // Reage a mudanças de autenticação (login, logout, reload de página)
 window.addEventListener('authChanged', (e) => {
   const user = e.detail.user;
