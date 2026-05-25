@@ -42,7 +42,9 @@ async function handleSubmit(e) {
     aceita_imagem: !!data.get('aceita_imagem'),
     aceita_termos: !!data.get('aceita_termos'),
     cpf: data.get('cpf') || '',
-    rg: data.get('rg') || ''
+    rg: data.get('rg') || '',
+    resp_cpf: data.get('resp_cpf') || '',
+    aceita_resp: !!data.get('aceita_resp')
   };
 
   try {
