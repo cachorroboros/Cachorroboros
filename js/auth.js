@@ -70,8 +70,8 @@ async function _onAuthStateUpdate(user) {
   if (logoutBtn) logoutBtn.style.display = loggedIn ? 'inline-flex' : 'none';
 
   if (loggedIn) {
-    await loadInscritosAsync();
-    await loadChamadasAsync();
+    await loadInscritos();
+    await loadChamadas();
 
     // Destrava abas restritas
     const lockInscritos    = document.getElementById('lock-screen');
