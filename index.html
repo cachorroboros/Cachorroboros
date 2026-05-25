@@ -3275,11 +3275,27 @@ const monthNames=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho',
 const AVATAR_COLORS=[{bg:'rgba(93,173,226,0.2)',fg:'#5dade2'},{bg:'rgba(88,214,141,0.2)',fg:'#58d68d'},{bg:'rgba(201,168,76,0.2)',fg:'#c9a84c'},{bg:'rgba(230,126,34,0.2)',fg:'#e67e22'},{bg:'rgba(192,57,43,0.2)',fg:'#c0392b'},{bg:'rgba(155,89,182,0.2)',fg:'#9b59b6'},{bg:'rgba(52,152,219,0.2)',fg:'#3498db'},{bg:'rgba(26,188,156,0.2)',fg:'#1abc9c'}];
 const TIER_CFG={S:{color:'var(--s)',bg:'rgba(93,173,226,0.12)',range:'≥80% WR'},A:{color:'var(--a)',bg:'rgba(88,214,141,0.1)',range:'65–79%'},B:{color:'var(--b)',bg:'rgba(243,156,18,0.1)',range:'50–64%'},C:{color:'var(--c)',bg:'rgba(230,126,34,0.1)',range:'35–49%'},D:{color:'var(--d)',bg:'rgba(231,76,60,0.1)',range:'<35%'}};
 
-function loadState(){return window._arenaStateCache||null;}
-function saveState(){
-  window._arenaStateCache=S;
-  if(window._firebaseReady && window._authUser){
-    window._setDoc(window._doc('config','arena_state'),{data:JSON.stringify(S)}).catch(e=>console.warn('Arena saveState error',e));
+async function loadState() {
+  if (!window._authUser) return null;
+  if (window._arenaStateCache) return window._arenaStateCache;
+
+  const { data, error } = await supabase
+    .from('config')
+    .select('data')
+    .eq('key', 'arena_state')
+    .single();
+
+  if (error) return mkState();
+  window._arenaStateCache = data.data;
+  return data.data;
+}
+
+async function saveState() {
+  window._arenaStateCache = S;
+  if (window._authUser) {
+    await supabase
+      .from('config')
+      .upsert({ key: 'arena_state', data: S }, { onConflict: 'key' });
   }
 }
 
