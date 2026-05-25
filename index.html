@@ -2970,40 +2970,62 @@ function fmtDate(s) {
 
 async function renderTable(search) {
   const arr = loadInscritos();
-  const decArr = await Promise.all(arr.map(async i => ({
-    ...i,
-    _cpfDec: await window._decryptField(i.cpf),
-    _rgDec: await window._decryptField(i.rg),
-  })));
   const q = (search || '').toLowerCase().trim();
-  const filtered = q ? decArr.filter(i => i.nome.toLowerCase().includes(q)) : decArr;
+  const filtered = q ? arr.filter(i => i.nome.toLowerCase().includes(q)) : arr;
+
   const tbody = document.getElementById('inscritos-tbody');
   const empty = document.getElementById('empty-state');
   const tableWrap = document.querySelector('.table-wrap');
   renderStats();
-  if (arr.length === 0) { tableWrap.style.display = 'none'; empty.style.display = 'block'; return; }
-  tableWrap.style.display = 'block'; empty.style.display = 'none';
-  tbody.innerHTML = filtered.map((i, idx) => `
+
+  if (arr.length === 0) {
+    tableWrap.style.display = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+  tableWrap.style.display = 'block';
+  empty.style.display = 'none';
+
+  // Para cada linha, obter CPF/RG via Edge Function se for admin
+  const rowsHtml = await Promise.all(filtered.map(async (i, idx) => {
+    let cpf = '🔒', rg = '🔒';
+    if (window._authUser) {
+      // Buscar dados sensíveis
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/get-sensitive-data?id=${i.id}`, {
+          headers: { Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}` }
+        });
+        if (res.ok) {
+          const sensitive = await res.json();
+          cpf = sensitive.cpf || '—';
+          rg = sensitive.rg || '—';
+        }
+      } catch (e) { /* mantém 🔒 */ }
+    }
+
+    return `
     <tr>
       <td style="color:var(--warm-gray);font-size:12px">${idx + 1}</td>
       <td class="td-name">${escHtml(i.nome)}${i.menor ? '<br><span class="pill pill-menor">Menor</span>' : ''}</td>
       <td>${fmtDate(i.data_nasc)}</td>
       <td>${i.idade || '—'}</td>
       <td style="white-space:nowrap">${escHtml(i.whatsapp)}</td>
-      <td>${escHtml(i._rgDec) || '—'}</td>
-      <td style="font-size:12px">${escHtml(i._cpfDec) || '—'}</td>
+      <td>${escHtml(rg)}</td>
+      <td style="font-size:12px">${escHtml(cpf)}</td>
       <td>${i.menor ? '<span class="pill pill-menor">Sim</span>' : '<span class="pill pill-no">Não</span>'}</td>
       <td>${i.restricao ? '<span class="pill pill-restric" title="'+escHtml(i.restricao)+'">Sim</span>' : '<span class="pill pill-ok">Não</span>'}</td>
       <td>${i.aceita_imagem ? '<span class="pill pill-ok">Autorizado</span>' : '<span class="pill pill-no">Não</span>'}</td>
-      <td style="font-size:12px;white-space:nowrap">${i.data_inscricao || '—'}</td>
+      <td style="font-size:12px;white-space:nowrap">${new Date(i.created_at).toLocaleDateString('pt-BR')}</td>
       <td>
         <div class="td-actions">
           <button class="act-btn act-wpp" title="WhatsApp" onclick="sendWpp('${escAttr(i.whatsapp)}','${escAttr(i.nome)}')">💬</button>
           <button class="act-btn act-del" title="Remover" onclick="deleteInscrito(${i.id})">🗑</button>
         </div>
       </td>
-    </tr>
-  `).join('');
+    </tr>`;
+  }));
+
+  tbody.innerHTML = rowsHtml.join('');
   if (filtered.length === 0) {
     tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;padding:32px;color:var(--warm-gray);font-size:14px">Nenhum resultado para "${escHtml(q)}"</td></tr>`;
   }
