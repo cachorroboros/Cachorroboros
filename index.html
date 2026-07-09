@@ -28,6 +28,7 @@
 <title>Cachorroboros Swordplay — Araras/SP</title>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Bebas+Neue&family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
+<link rel="icon" href="src/Cachorroboros_notext.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" integrity="sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw" crossorigin="anonymous"></script>
 <!-- Supabase SDK -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.106.2" integrity="sha384-4Cjkyy4cE1EgIS0C+Y3xzGmJ2noQFRRU91yKAW8IxtPfVtbQXPMqadSc3sYnjwou" crossorigin="anonymous"></script>
@@ -95,7 +96,7 @@
   </div>
 </nav>
 
-<!-- ================ MODAL DE LOGIN FIREBASE ================ -->
+<!-- ================ MODAL DE LOGIN ================ -->
 <div id="login-modal-bg" class="login-modal-bg" onclick="if(event.target===this)closeLoginModal()">
   <div class="login-modal">
     <div class="login-modal-icon">🗡</div>
@@ -449,13 +450,11 @@
 
 <!-- CHAMADA -->
 <section id="tab-chamada" class="section">
-  <div id="chamada-lock-screen">
-    <div class="chamada-lock">
-      <div class="chamada-lock-icon">🔒</div>
-      <div class="chamada-lock-title">Área Restrita</div>
-      <p class="chamada-lock-sub">Acesso exclusivo para coordenadores</p>
-      <button class="chamada-unlock-btn" onclick="openLoginModal()">🔑 Fazer Login</button>
-    </div>
+  <div id="lock-screen" class="lock-screen">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">Área Restrita</div>
+    <div class="lock-sub">Esta área é exclusiva para coordenadores.<br>Faça login para continuar.</div>
+    <button class="lock-btn" onclick="openLoginModal()">🔑 Fazer Login</button>
   </div>
 
   <div id="chamada-content" style="display:none">
